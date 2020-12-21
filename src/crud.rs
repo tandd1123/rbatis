@@ -16,6 +16,7 @@ use crate::plugin::page::{IPageRequest, Page};
 use crate::rbatis::Rbatis;
 use crate::utils::string_util::to_snake_name;
 use crate::wrapper::Wrapper;
+use crate::utils::error_util::ToResult;
 
 /// DB Table model trait
 ///
@@ -217,6 +218,7 @@ impl<C> Ids<C> for Vec<C> where C: Id {
 #[async_trait]
 pub trait CRUD {
     async fn save<T>(&self, context_id: &str, entity: &T) -> Result<DBExecResult> where T: CRUDEnable;
+    async fn save_py<T>(&self, context_id: &str, table_name: &str, entity: &T, formats: &str) -> Result<DBExecResult> where T: Serialize + Send + Sync;
     async fn save_batch<T>(&self, context_id: &str, entity: &[T]) -> Result<DBExecResult> where T: CRUDEnable;
 
 
@@ -246,6 +248,21 @@ impl CRUD for Rbatis {
         let (values, args) = entity.make_value_sql_arg(&self.driver_type()?, &mut index)?;
         let sql = format!("INSERT INTO {} ({}) VALUES ({})", T::table_name(), T::table_columns(), values);
         return self.exec_prepare(context_id, sql.as_str(), &args).await;
+    }
+
+    /// save one entity to database,use py_sql and Serialize struct
+    /// formats: "po:Point(#{item.x},#{item.y})"
+    async fn save_py<T>(&self, context_id: &str, table_name: &str, entity: &T, formats: &str) -> Result<DBExecResult>
+        where T: Serialize + Send + Sync {
+        let formats: Vec<&str> = formats.split("|").collect();
+
+        return self.py_exec(context_id, "INSERT INTO ${table_name}(
+                  trim ',': for key,item in entity: if item != null:
+                     ${key},
+                  ) VALUES (
+                  trim ',': for key,item in entity: if v != null:
+                      #{item},
+                  )", &json!({ "entity":entity,  "table_name":table_name })).await;
     }
 
     /// save batch makes many value into  only one sql. make sure your data not  to long!

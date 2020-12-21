@@ -84,6 +84,31 @@ mod test {
         }
     }
 
+
+    #[async_std::test]
+    pub async fn test_save_py() {
+        let rb = init_rbatis().await;
+        let activity = BizActivity {
+            id: Some("12312".to_string()),
+            name: Some("12312".to_string()),
+            pc_link: None,
+            h5_link: None,
+            pc_banner_img: None,
+            h5_banner_img: None,
+            sort: Some("1".to_string()),
+            status: Some(1),
+            remark: None,
+            create_time: Some(NaiveDateTime::now()),
+            version: Some(BigDecimal::from(1)),
+            delete_flag: Some(1),
+        };
+        rb.remove_by_id::<BizActivity>("", &"12312".to_string()).await;
+        let r = rb.save_py("", "biz_activity",&activity).await;
+        if r.is_err() {
+            println!("{}", r.err().unwrap().to_string());
+        }
+    }
+
     #[async_std::test]
     pub async fn test_save_batch() {
         let rb = init_rbatis().await;
